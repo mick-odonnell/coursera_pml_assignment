@@ -30,6 +30,7 @@ library(tidymodels)
 library(parsnip)
 library(skimr)
 library(moments) # for skewness test
+library(tune)
 
 train_data <- read_csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
 test_data <- read_csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
@@ -48,10 +49,11 @@ _Note:_ I have elected to use the `tidymodels` package, as it is the natural evo
 * there seem to be a lot of NA values, with only around 100 variables having only 2% of datapoints recorded - I am going to discount these observations as an equipment failure - no other method of imputation could succesfully complete these variables. 
 * removing the mostly incomplete predictors and admin variables (timestamp etc) leaves us with 52 predictors.  
 * the scale over all of the predictors range from negative -1000 to positive 1000, with some predictors in the 10e-02 scale. There might be a need to scale and centre?  
-* initial look at the mini-histograms via `skim` does not show any major skewing errors, but some more investigation of this may be necessary.. About a quarter are highly skewed, another quarter are moderately skewed, and half are roughly symmetrical. 
+* initial look at the mini-histograms via `skim` does not show any major skewing errors, but some more investigation of this may be necessary.. About a quarter are highly skewed, another quarter are moderately skewed, and half are roughly symmetrical.  
+* there is some degree of correlation between the predictors but it is relatively minor. It will be controlled for in any case.
 
 
-```{r explore}
+```{r explore1}
 head(train_data)
 train_skim <- skim(train_data) # inspect variable type, completeness and distribution
 
@@ -66,7 +68,9 @@ train_data %>%
 # are the classes equally represented?
 qc1_train_data %>% 
   count(classe) # yes, roughly speaking
+```
 
+```{expolre2, eval = FALSE}
 # what is the skewness like in the predictors?
 qc1_train_data %>% 
   select(-classe) %>% 
@@ -84,15 +88,28 @@ skewness %>%
 skewness_rating$var <- names(skewness)
 skewness_rating %>% 
   count(skew_type)
+
+# check for correlation between any of the predictors
+# qc1_train_data %>% 
+  # dplyr::select(-classe) %>% 
+  # pcor() -> pcor
+
+# pcor[["estimate"]] -> p_correlations
 ```
 
 ## Modelling
 
 Let's attempt to fit three types of models naively, and see what type of results we get. First we will need to subset the data, in order to allow us to perform some vaildation on the data with our models. We will create an 80:20 split, and use the _classe_ variable to stratify.
 
-We will utilise the `recipes` package to create out pre-processing workflow on our training data, which can then be applied to the testing data.
+We will utilise the `recipes` package to create out pre-processing workflow on our training data, which can then be applied to the testing data. Big credit to the excellent tutorial at [RViews](https://rviews.rstudio.com/2019/06/19/a-gentle-intro-to-tidymodels/). 
 
-```{r modelling}
+## Random Forest Model
+
+The first model to be tried is a random forest model. We will use 100 trees, and the default settings for the model as per the parsnip package.
+
+```{r modelling-rf}
+set.seed(1225)
+
 exercise_data <- qc1_train_data %>% 
   initial_split(prop = 4/5, strata = classe) # note we're using the subset of 'good' predictors
 
@@ -100,8 +117,85 @@ exercise_data %>%
   training() %>%
   glimpse() # 15700 x 53
 
+# prep the data for a random forest model, by scaling and centering the predictors
+exercise_recipe_rf <- exercise_data %>%
+  training() %>% 
+  recipe(classe ~ .) %>%
+  step_string2factor(all_outcomes(), -all_predictors()) %>% 
+  step_corr(all_predictors()) %>% 
+  step_scale(all_predictors(), -all_outcomes()) %>% 
+  step_center(all_predictors(), -all_outcomes()) %>% prep()
+
+exercise_training_prepped <- juice(exercise_recipe_rf)  
+  
+exercise_testing_prepped <- exercise_recipe_rf %>% 
+  bake(new_data = testing(exercise_data))
+
+exercise_ranger <- rand_forest(trees = 100, mode = "classification") %>%
+  set_engine("ranger") %>%
+  fit(classe ~ ., data = exercise_training_prepped)
+
+ranger_results <- predict(exercise_ranger, exercise_testing_prepped)
+
+ranger_results %>% 
+  bind_cols(exercise_testing_prepped) %>% 
+  metrics(truth = classe, estimate = .pred_class)
+```
+
+For the Random Forest model fitted, we obtain the following metrics:  
+>>>  .metric  .estimator .estimate
+>>>  <chr>    <chr>          <dbl>
+>>>1 accuracy multiclass     0.994
+>>>2 kap      multiclass     0.992
+
+The high level of accuracy achieved with just the default setting for this model negates the need for a cross-validation or recursive hyperparameter tuning appraoch.
+
+## Logistic Regression
+
+Next we will attempt to fit a logistic regression model. This type of model is popular due to its ease of intrepretation, but it has some flaws, including sacrificing performance in favour of intrepretability. I am using as a guide the excellent work by Max Kuhn in his book with Johnson _"Feature Engineering and Selection"_, also https://tidymodels.github.io/tune/reference/tune_grid.html, https://tidymodels.github.io/parsnip/reference/logistic_reg.html, 
+
+```{r logistic-regression}
+
+exercise_recipe_glm <- exercise_data %>%
+  training() %>% 
+  recipe(classe ~ .) %>%
+  step_string2factor(all_outcomes(), -all_predictors()) %>%
+  step_corr(all_predictors()) %>% 
+  step_scale(all_predictors(), -all_outcomes()) %>% 
+  step_center(all_predictors(), -all_outcomes()) %>% prep()
+
+exercise_training_glm_prepped <- juice(exercise_recipe_glm)
+
+exercise_testing_glm_prepped <- exercise_recipe_glm %>% 
+  bake(new_data = testing(exercise_data))
+
+exercise_logis_reg <- 
+  logistic_reg(mode = "classification") %>% 
+  set_engine("glm") %>% 
+  fit(classe ~ .,data = exercise_training_glm_prepped)
+
+glm_result <- predict(exercise_logis_reg, exercise_testing_glm_prepped)
+
+bind_cols(glm_result, exercise_testing_glm_prepped) %>% 
+  metrics(truth = classe, estimate = .pred_class)
+```
+
+```{r tuning}
+# set a tuning grid
+glm_grid <- grid_regular(
+  mixture(),
+  penalty(),
+  levels = 3 # or c(3, 4), etc
+)
+glmnet_tuned <- 
+  tune_grid(exercise_recipe,
+  model = exercise_logis_reg,
+  resamples = folds,
+  param_info = NULL,
+  grid = glm_grid)
 
 ```
+
 
 
 
