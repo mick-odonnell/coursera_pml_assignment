@@ -30,10 +30,10 @@ library(tidymodels)
 library(parsnip)
 library(skimr)
 library(moments) # for skewness test
-library(tune)
+#library(tune)
 
-train_data <- read_csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
-test_data <- read_csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+train_data <- read_csv("data/pml-training.csv")
+test_data <- read_csv("data/pml-testing.csv")
 ```
 
 ## Exploration
@@ -155,7 +155,6 @@ The high level of accuracy achieved with just the default setting for this model
 Next we will attempt to fit a logistic regression model. This type of model is popular due to its ease of intrepretation, but it has some flaws, including sacrificing performance in favour of intrepretability. I am using as a guide the excellent work by Max Kuhn in his book with Johnson _"Feature Engineering and Selection"_, also https://tidymodels.github.io/tune/reference/tune_grid.html, https://tidymodels.github.io/parsnip/reference/logistic_reg.html, 
 
 ```{r logistic-regression}
-
 exercise_recipe_glm <- exercise_data %>%
   training() %>% 
   recipe(classe ~ .) %>%
@@ -180,20 +179,29 @@ bind_cols(glm_result, exercise_testing_glm_prepped) %>%
   metrics(truth = classe, estimate = .pred_class)
 ```
 
-```{r tuning}
-# set a tuning grid
-glm_grid <- grid_regular(
-  mixture(),
-  penalty(),
-  levels = 3 # or c(3, 4), etc
-)
-glmnet_tuned <- 
-  tune_grid(exercise_recipe,
-  model = exercise_logis_reg,
-  resamples = folds,
-  param_info = NULL,
-  grid = glm_grid)
+The above result is not great;
 
+>>>   .metric  .estimator .estimate
+>>>   <chr>    <chr>          <dbl>
+>>> 1 accuracy multiclass     0.391
+>>> 2 kap      multiclass     0.222
+
+It might be worthwhile running a tuning process to try to improve the model's predictive accuracy, and to use cross-validation also. 
+
+```{r tuning}
+# parsnip is proving onerous in terms of the learning curve, especially for tuning etc. Applied Predictive Modelling book has a good section on modelling the compressive strength of concrete, where several different models are fitted, using cross-validation and tuning grids.
+
+ctrl <- trainControl(method = "repeatedcv",
+                     repeats = 5,
+                     number = 10)
+
+set.seed(100368)
+
+glmnet_model <- train(x = exercise_training_glm_prepped %>% select(-classe),
+                   y = exercise_training_glm_prepped$classe,
+                   method = "glmnet",
+                   family = "multinomial",
+                   trControl = ctrl)
 ```
 
 
