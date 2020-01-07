@@ -199,6 +199,19 @@ summary {
 <p><a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv" class="uri">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</a></p>
 <p>The test data are available here:</p>
 <p><a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv" class="uri">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv</a></p>
+<pre class="r"><code>library(tidyverse)
+library(tidymodels)
+library(parsnip)
+library(skimr)
+library(moments) # for skewness test
+library(caret)
+#library(tune)
+
+#train_data &lt;- read_csv(&quot;data/pml-training.csv&quot;)
+#test_data &lt;- read_csv(&quot;data/pml-testing.csv&quot;)
+
+train_data &lt;- read_csv(&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv&quot;)
+test_data &lt;- read_csv(&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv&quot;)</code></pre>
 <div id="exploration" class="section level2">
 <h2>Exploration</h2>
 <p>The first task is to explore the data, to reveal what type of modelling might be appropriate, and what sort of preprocessing is necessary.</p>
@@ -223,16 +236,54 @@ summary {
 </li>
 <li>there is some degree of correlation between the predictors but it is relatively minor. It will be controlled for in any case.</li>
 </ul>
+<pre class="r"><code>head(train_data)</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
 {"columns":[{"label":["X1"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["user_name"],"name":[2],"type":["chr"],"align":["left"]},{"label":["raw_timestamp_part_1"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["raw_timestamp_part_2"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["cvtd_timestamp"],"name":[5],"type":["chr"],"align":["left"]},{"label":["new_window"],"name":[6],"type":["chr"],"align":["left"]},{"label":["num_window"],"name":[7],"type":["dbl"],"align":["right"]},{"label":["roll_belt"],"name":[8],"type":["dbl"],"align":["right"]},{"label":["pitch_belt"],"name":[9],"type":["dbl"],"align":["right"]},{"label":["yaw_belt"],"name":[10],"type":["dbl"],"align":["right"]},{"label":["total_accel_belt"],"name":[11],"type":["dbl"],"align":["right"]},{"label":["kurtosis_roll_belt"],"name":[12],"type":["chr"],"align":["left"]},{"label":["kurtosis_picth_belt"],"name":[13],"type":["chr"],"align":["left"]},{"label":["kurtosis_yaw_belt"],"name":[14],"type":["chr"],"align":["left"]},{"label":["skewness_roll_belt"],"name":[15],"type":["chr"],"align":["left"]},{"label":["skewness_roll_belt.1"],"name":[16],"type":["chr"],"align":["left"]},{"label":["skewness_yaw_belt"],"name":[17],"type":["chr"],"align":["left"]},{"label":["max_roll_belt"],"name":[18],"type":["dbl"],"align":["right"]},{"label":["max_picth_belt"],"name":[19],"type":["dbl"],"align":["right"]},{"label":["max_yaw_belt"],"name":[20],"type":["chr"],"align":["left"]},{"label":["min_roll_belt"],"name":[21],"type":["dbl"],"align":["right"]},{"label":["min_pitch_belt"],"name":[22],"type":["dbl"],"align":["right"]},{"label":["min_yaw_belt"],"name":[23],"type":["chr"],"align":["left"]},{"label":["amplitude_roll_belt"],"name":[24],"type":["dbl"],"align":["right"]},{"label":["amplitude_pitch_belt"],"name":[25],"type":["dbl"],"align":["right"]},{"label":["amplitude_yaw_belt"],"name":[26],"type":["chr"],"align":["left"]},{"label":["var_total_accel_belt"],"name":[27],"type":["dbl"],"align":["right"]},{"label":["avg_roll_belt"],"name":[28],"type":["dbl"],"align":["right"]},{"label":["stddev_roll_belt"],"name":[29],"type":["dbl"],"align":["right"]},{"label":["var_roll_belt"],"name":[30],"type":["dbl"],"align":["right"]},{"label":["avg_pitch_belt"],"name":[31],"type":["dbl"],"align":["right"]},{"label":["stddev_pitch_belt"],"name":[32],"type":["dbl"],"align":["right"]},{"label":["var_pitch_belt"],"name":[33],"type":["dbl"],"align":["right"]},{"label":["avg_yaw_belt"],"name":[34],"type":["dbl"],"align":["right"]},{"label":["stddev_yaw_belt"],"name":[35],"type":["dbl"],"align":["right"]},{"label":["var_yaw_belt"],"name":[36],"type":["dbl"],"align":["right"]},{"label":["gyros_belt_x"],"name":[37],"type":["dbl"],"align":["right"]},{"label":["gyros_belt_y"],"name":[38],"type":["dbl"],"align":["right"]},{"label":["gyros_belt_z"],"name":[39],"type":["dbl"],"align":["right"]},{"label":["accel_belt_x"],"name":[40],"type":["dbl"],"align":["right"]},{"label":["accel_belt_y"],"name":[41],"type":["dbl"],"align":["right"]},{"label":["accel_belt_z"],"name":[42],"type":["dbl"],"align":["right"]},{"label":["magnet_belt_x"],"name":[43],"type":["dbl"],"align":["right"]},{"label":["magnet_belt_y"],"name":[44],"type":["dbl"],"align":["right"]},{"label":["magnet_belt_z"],"name":[45],"type":["dbl"],"align":["right"]},{"label":["roll_arm"],"name":[46],"type":["dbl"],"align":["right"]},{"label":["pitch_arm"],"name":[47],"type":["dbl"],"align":["right"]},{"label":["yaw_arm"],"name":[48],"type":["dbl"],"align":["right"]},{"label":["total_accel_arm"],"name":[49],"type":["dbl"],"align":["right"]},{"label":["var_accel_arm"],"name":[50],"type":["dbl"],"align":["right"]},{"label":["avg_roll_arm"],"name":[51],"type":["dbl"],"align":["right"]},{"label":["stddev_roll_arm"],"name":[52],"type":["dbl"],"align":["right"]},{"label":["var_roll_arm"],"name":[53],"type":["dbl"],"align":["right"]},{"label":["avg_pitch_arm"],"name":[54],"type":["dbl"],"align":["right"]},{"label":["stddev_pitch_arm"],"name":[55],"type":["dbl"],"align":["right"]},{"label":["var_pitch_arm"],"name":[56],"type":["dbl"],"align":["right"]},{"label":["avg_yaw_arm"],"name":[57],"type":["dbl"],"align":["right"]},{"label":["stddev_yaw_arm"],"name":[58],"type":["dbl"],"align":["right"]},{"label":["var_yaw_arm"],"name":[59],"type":["dbl"],"align":["right"]},{"label":["gyros_arm_x"],"name":[60],"type":["dbl"],"align":["right"]},{"label":["gyros_arm_y"],"name":[61],"type":["dbl"],"align":["right"]},{"label":["gyros_arm_z"],"name":[62],"type":["dbl"],"align":["right"]},{"label":["accel_arm_x"],"name":[63],"type":["dbl"],"align":["right"]},{"label":["accel_arm_y"],"name":[64],"type":["dbl"],"align":["right"]},{"label":["accel_arm_z"],"name":[65],"type":["dbl"],"align":["right"]},{"label":["magnet_arm_x"],"name":[66],"type":["dbl"],"align":["right"]},{"label":["magnet_arm_y"],"name":[67],"type":["dbl"],"align":["right"]},{"label":["magnet_arm_z"],"name":[68],"type":["dbl"],"align":["right"]},{"label":["kurtosis_roll_arm"],"name":[69],"type":["dbl"],"align":["right"]},{"label":["kurtosis_picth_arm"],"name":[70],"type":["chr"],"align":["left"]},{"label":["kurtosis_yaw_arm"],"name":[71],"type":["chr"],"align":["left"]},{"label":["skewness_roll_arm"],"name":[72],"type":["dbl"],"align":["right"]},{"label":["skewness_pitch_arm"],"name":[73],"type":["chr"],"align":["left"]},{"label":["skewness_yaw_arm"],"name":[74],"type":["chr"],"align":["left"]},{"label":["max_roll_arm"],"name":[75],"type":["dbl"],"align":["right"]},{"label":["max_picth_arm"],"name":[76],"type":["dbl"],"align":["right"]},{"label":["max_yaw_arm"],"name":[77],"type":["dbl"],"align":["right"]},{"label":["min_roll_arm"],"name":[78],"type":["dbl"],"align":["right"]},{"label":["min_pitch_arm"],"name":[79],"type":["dbl"],"align":["right"]},{"label":["min_yaw_arm"],"name":[80],"type":["dbl"],"align":["right"]},{"label":["amplitude_roll_arm"],"name":[81],"type":["dbl"],"align":["right"]},{"label":["amplitude_pitch_arm"],"name":[82],"type":["dbl"],"align":["right"]},{"label":["amplitude_yaw_arm"],"name":[83],"type":["dbl"],"align":["right"]},{"label":["roll_dumbbell"],"name":[84],"type":["dbl"],"align":["right"]},{"label":["pitch_dumbbell"],"name":[85],"type":["dbl"],"align":["right"]},{"label":["yaw_dumbbell"],"name":[86],"type":["dbl"],"align":["right"]},{"label":["kurtosis_roll_dumbbell"],"name":[87],"type":["dbl"],"align":["right"]},{"label":["kurtosis_picth_dumbbell"],"name":[88],"type":["dbl"],"align":["right"]},{"label":["kurtosis_yaw_dumbbell"],"name":[89],"type":["chr"],"align":["left"]},{"label":["skewness_roll_dumbbell"],"name":[90],"type":["dbl"],"align":["right"]},{"label":["skewness_pitch_dumbbell"],"name":[91],"type":["dbl"],"align":["right"]},{"label":["skewness_yaw_dumbbell"],"name":[92],"type":["chr"],"align":["left"]},{"label":["max_roll_dumbbell"],"name":[93],"type":["dbl"],"align":["right"]},{"label":["max_picth_dumbbell"],"name":[94],"type":["dbl"],"align":["right"]},{"label":["max_yaw_dumbbell"],"name":[95],"type":["dbl"],"align":["right"]},{"label":["min_roll_dumbbell"],"name":[96],"type":["dbl"],"align":["right"]},{"label":["min_pitch_dumbbell"],"name":[97],"type":["dbl"],"align":["right"]},{"label":["min_yaw_dumbbell"],"name":[98],"type":["dbl"],"align":["right"]},{"label":["amplitude_roll_dumbbell"],"name":[99],"type":["dbl"],"align":["right"]},{"label":["amplitude_pitch_dumbbell"],"name":[100],"type":["dbl"],"align":["right"]},{"label":["amplitude_yaw_dumbbell"],"name":[101],"type":["dbl"],"align":["right"]},{"label":["total_accel_dumbbell"],"name":[102],"type":["dbl"],"align":["right"]},{"label":["var_accel_dumbbell"],"name":[103],"type":["dbl"],"align":["right"]},{"label":["avg_roll_dumbbell"],"name":[104],"type":["dbl"],"align":["right"]},{"label":["stddev_roll_dumbbell"],"name":[105],"type":["dbl"],"align":["right"]},{"label":["var_roll_dumbbell"],"name":[106],"type":["dbl"],"align":["right"]},{"label":["avg_pitch_dumbbell"],"name":[107],"type":["dbl"],"align":["right"]},{"label":["stddev_pitch_dumbbell"],"name":[108],"type":["dbl"],"align":["right"]},{"label":["var_pitch_dumbbell"],"name":[109],"type":["dbl"],"align":["right"]},{"label":["avg_yaw_dumbbell"],"name":[110],"type":["dbl"],"align":["right"]},{"label":["stddev_yaw_dumbbell"],"name":[111],"type":["dbl"],"align":["right"]},{"label":["var_yaw_dumbbell"],"name":[112],"type":["dbl"],"align":["right"]},{"label":["gyros_dumbbell_x"],"name":[113],"type":["dbl"],"align":["right"]},{"label":["gyros_dumbbell_y"],"name":[114],"type":["dbl"],"align":["right"]},{"label":["gyros_dumbbell_z"],"name":[115],"type":["dbl"],"align":["right"]},{"label":["accel_dumbbell_x"],"name":[116],"type":["dbl"],"align":["right"]},{"label":["accel_dumbbell_y"],"name":[117],"type":["dbl"],"align":["right"]},{"label":["accel_dumbbell_z"],"name":[118],"type":["dbl"],"align":["right"]},{"label":["magnet_dumbbell_x"],"name":[119],"type":["dbl"],"align":["right"]},{"label":["magnet_dumbbell_y"],"name":[120],"type":["dbl"],"align":["right"]},{"label":["magnet_dumbbell_z"],"name":[121],"type":["dbl"],"align":["right"]},{"label":["roll_forearm"],"name":[122],"type":["dbl"],"align":["right"]},{"label":["pitch_forearm"],"name":[123],"type":["dbl"],"align":["right"]},{"label":["yaw_forearm"],"name":[124],"type":["dbl"],"align":["right"]},{"label":["kurtosis_roll_forearm"],"name":[125],"type":["chr"],"align":["left"]},{"label":["kurtosis_picth_forearm"],"name":[126],"type":["chr"],"align":["left"]},{"label":["kurtosis_yaw_forearm"],"name":[127],"type":["chr"],"align":["left"]},{"label":["skewness_roll_forearm"],"name":[128],"type":["chr"],"align":["left"]},{"label":["skewness_pitch_forearm"],"name":[129],"type":["chr"],"align":["left"]},{"label":["skewness_yaw_forearm"],"name":[130],"type":["chr"],"align":["left"]},{"label":["max_roll_forearm"],"name":[131],"type":["dbl"],"align":["right"]},{"label":["max_picth_forearm"],"name":[132],"type":["dbl"],"align":["right"]},{"label":["max_yaw_forearm"],"name":[133],"type":["chr"],"align":["left"]},{"label":["min_roll_forearm"],"name":[134],"type":["dbl"],"align":["right"]},{"label":["min_pitch_forearm"],"name":[135],"type":["dbl"],"align":["right"]},{"label":["min_yaw_forearm"],"name":[136],"type":["chr"],"align":["left"]},{"label":["amplitude_roll_forearm"],"name":[137],"type":["dbl"],"align":["right"]},{"label":["amplitude_pitch_forearm"],"name":[138],"type":["dbl"],"align":["right"]},{"label":["amplitude_yaw_forearm"],"name":[139],"type":["chr"],"align":["left"]},{"label":["total_accel_forearm"],"name":[140],"type":["dbl"],"align":["right"]},{"label":["var_accel_forearm"],"name":[141],"type":["dbl"],"align":["right"]},{"label":["avg_roll_forearm"],"name":[142],"type":["dbl"],"align":["right"]},{"label":["stddev_roll_forearm"],"name":[143],"type":["dbl"],"align":["right"]},{"label":["var_roll_forearm"],"name":[144],"type":["dbl"],"align":["right"]},{"label":["avg_pitch_forearm"],"name":[145],"type":["dbl"],"align":["right"]},{"label":["stddev_pitch_forearm"],"name":[146],"type":["dbl"],"align":["right"]},{"label":["var_pitch_forearm"],"name":[147],"type":["dbl"],"align":["right"]},{"label":["avg_yaw_forearm"],"name":[148],"type":["dbl"],"align":["right"]},{"label":["stddev_yaw_forearm"],"name":[149],"type":["dbl"],"align":["right"]},{"label":["var_yaw_forearm"],"name":[150],"type":["dbl"],"align":["right"]},{"label":["gyros_forearm_x"],"name":[151],"type":["dbl"],"align":["right"]},{"label":["gyros_forearm_y"],"name":[152],"type":["dbl"],"align":["right"]},{"label":["gyros_forearm_z"],"name":[153],"type":["dbl"],"align":["right"]},{"label":["accel_forearm_x"],"name":[154],"type":["dbl"],"align":["right"]},{"label":["accel_forearm_y"],"name":[155],"type":["dbl"],"align":["right"]},{"label":["accel_forearm_z"],"name":[156],"type":["dbl"],"align":["right"]},{"label":["magnet_forearm_x"],"name":[157],"type":["dbl"],"align":["right"]},{"label":["magnet_forearm_y"],"name":[158],"type":["dbl"],"align":["right"]},{"label":["magnet_forearm_z"],"name":[159],"type":["dbl"],"align":["right"]},{"label":["classe"],"name":[160],"type":["chr"],"align":["left"]}],"data":[{"1":"1","2":"carlitos","3":"1323084231","4":"788290","5":"05/12/2011 11:23","6":"no","7":"11","8":"1.41","9":"8.07","10":"-94.4","11":"3","12":"NA","13":"NA","14":"NA","15":"NA","16":"NA","17":"NA","18":"NA","19":"NA","20":"NA","21":"NA","22":"NA","23":"NA","24":"NA","25":"NA","26":"NA","27":"NA","28":"NA","29":"NA","30":"NA","31":"NA","32":"NA","33":"NA","34":"NA","35":"NA","36":"NA","37":"0.00","38":"0.00","39":"-0.02","40":"-21","41":"4","42":"22","43":"-3","44":"599","45":"-313","46":"-128","47":"22.5","48":"-161","49":"34","50":"NA","51":"NA","52":"NA","53":"NA","54":"NA","55":"NA","56":"NA","57":"NA","58":"NA","59":"NA","60":"0.00","61":"0.00","62":"-0.02","63":"-288","64":"109","65":"-123","66":"-368","67":"337","68":"516","69":"NA","70":"NA","71":"NA","72":"NA","73":"NA","74":"NA","75":"NA","76":"NA","77":"NA","78":"NA","79":"NA","80":"NA","81":"NA","82":"NA","83":"NA","84":"13.05217","85":"-70.49400","86":"-84.87394","87":"NA","88":"NA","89":"NA","90":"NA","91":"NA","92":"NA","93":"NA","94":"NA","95":"NA","96":"NA","97":"NA","98":"NA","99":"NA","100":"NA","101":"NA","102":"37","103":"NA","104":"NA","105":"NA","106":"NA","107":"NA","108":"NA","109":"NA","110":"NA","111":"NA","112":"NA","113":"0","114":"-0.02","115":"0.00","116":"-234","117":"47","118":"-271","119":"-559","120":"293","121":"-65","122":"28.4","123":"-63.9","124":"-153","125":"NA","126":"NA","127":"NA","128":"NA","129":"NA","130":"NA","131":"NA","132":"NA","133":"NA","134":"NA","135":"NA","136":"NA","137":"NA","138":"NA","139":"NA","140":"36","141":"NA","142":"NA","143":"NA","144":"NA","145":"NA","146":"NA","147":"NA","148":"NA","149":"NA","150":"NA","151":"0.03","152":"0.00","153":"-0.02","154":"192","155":"203","156":"-215","157":"-17","158":"654","159":"476","160":"A"},{"1":"2","2":"carlitos","3":"1323084231","4":"808298","5":"05/12/2011 11:23","6":"no","7":"11","8":"1.41","9":"8.07","10":"-94.4","11":"3","12":"NA","13":"NA","14":"NA","15":"NA","16":"NA","17":"NA","18":"NA","19":"NA","20":"NA","21":"NA","22":"NA","23":"NA","24":"NA","25":"NA","26":"NA","27":"NA","28":"NA","29":"NA","30":"NA","31":"NA","32":"NA","33":"NA","34":"NA","35":"NA","36":"NA","37":"0.02","38":"0.00","39":"-0.02","40":"-22","41":"4","42":"22","43":"-7","44":"608","45":"-311","46":"-128","47":"22.5","48":"-161","49":"34","50":"NA","51":"NA","52":"NA","53":"NA","54":"NA","55":"NA","56":"NA","57":"NA","58":"NA","59":"NA","60":"0.02","61":"-0.02","62":"-0.02","63":"-290","64":"110","65":"-125","66":"-369","67":"337","68":"513","69":"NA","70":"NA","71":"NA","72":"NA","73":"NA","74":"NA","75":"NA","76":"NA","77":"NA","78":"NA","79":"NA","80":"NA","81":"NA","82":"NA","83":"NA","84":"13.13074","85":"-70.63751","86":"-84.71065","87":"NA","88":"NA","89":"NA","90":"NA","91":"NA","92":"NA","93":"NA","94":"NA","95":"NA","96":"NA","97":"NA","98":"NA","99":"NA","100":"NA","101":"NA","102":"37","103":"NA","104":"NA","105":"NA","106":"NA","107":"NA","108":"NA","109":"NA","110":"NA","111":"NA","112":"NA","113":"0","114":"-0.02","115":"0.00","116":"-233","117":"47","118":"-269","119":"-555","120":"296","121":"-64","122":"28.3","123":"-63.9","124":"-153","125":"NA","126":"NA","127":"NA","128":"NA","129":"NA","130":"NA","131":"NA","132":"NA","133":"NA","134":"NA","135":"NA","136":"NA","137":"NA","138":"NA","139":"NA","140":"36","141":"NA","142":"NA","143":"NA","144":"NA","145":"NA","146":"NA","147":"NA","148":"NA","149":"NA","150":"NA","151":"0.02","152":"0.00","153":"-0.02","154":"192","155":"203","156":"-216","157":"-18","158":"661","159":"473","160":"A"},{"1":"3","2":"carlitos","3":"1323084231","4":"820366","5":"05/12/2011 11:23","6":"no","7":"11","8":"1.42","9":"8.07","10":"-94.4","11":"3","12":"NA","13":"NA","14":"NA","15":"NA","16":"NA","17":"NA","18":"NA","19":"NA","20":"NA","21":"NA","22":"NA","23":"NA","24":"NA","25":"NA","26":"NA","27":"NA","28":"NA","29":"NA","30":"NA","31":"NA","32":"NA","33":"NA","34":"NA","35":"NA","36":"NA","37":"0.00","38":"0.00","39":"-0.02","40":"-20","41":"5","42":"23","43":"-2","44":"600","45":"-305","46":"-128","47":"22.5","48":"-161","49":"34","50":"NA","51":"NA","52":"NA","53":"NA","54":"NA","55":"NA","56":"NA","57":"NA","58":"NA","59":"NA","60":"0.02","61":"-0.02","62":"-0.02","63":"-289","64":"110","65":"-126","66":"-368","67":"344","68":"513","69":"NA","70":"NA","71":"NA","72":"NA","73":"NA","74":"NA","75":"NA","76":"NA","77":"NA","78":"NA","79":"NA","80":"NA","81":"NA","82":"NA","83":"NA","84":"12.85075","85":"-70.27812","86":"-85.14078","87":"NA","88":"NA","89":"NA","90":"NA","91":"NA","92":"NA","93":"NA","94":"NA","95":"NA","96":"NA","97":"NA","98":"NA","99":"NA","100":"NA","101":"NA","102":"37","103":"NA","104":"NA","105":"NA","106":"NA","107":"NA","108":"NA","109":"NA","110":"NA","111":"NA","112":"NA","113":"0","114":"-0.02","115":"0.00","116":"-232","117":"46","118":"-270","119":"-561","120":"298","121":"-63","122":"28.3","123":"-63.9","124":"-152","125":"NA","126":"NA","127":"NA","128":"NA","129":"NA","130":"NA","131":"NA","132":"NA","133":"NA","134":"NA","135":"NA","136":"NA","137":"NA","138":"NA","139":"NA","140":"36","141":"NA","142":"NA","143":"NA","144":"NA","145":"NA","146":"NA","147":"NA","148":"NA","149":"NA","150":"NA","151":"0.03","152":"-0.02","153":"0.00","154":"196","155":"204","156":"-213","157":"-18","158":"658","159":"469","160":"A"},{"1":"4","2":"carlitos","3":"1323084232","4":"120339","5":"05/12/2011 11:23","6":"no","7":"12","8":"1.48","9":"8.05","10":"-94.4","11":"3","12":"NA","13":"NA","14":"NA","15":"NA","16":"NA","17":"NA","18":"NA","19":"NA","20":"NA","21":"NA","22":"NA","23":"NA","24":"NA","25":"NA","26":"NA","27":"NA","28":"NA","29":"NA","30":"NA","31":"NA","32":"NA","33":"NA","34":"NA","35":"NA","36":"NA","37":"0.02","38":"0.00","39":"-0.03","40":"-22","41":"3","42":"21","43":"-6","44":"604","45":"-310","46":"-128","47":"22.1","48":"-161","49":"34","50":"NA","51":"NA","52":"NA","53":"NA","54":"NA","55":"NA","56":"NA","57":"NA","58":"NA","59":"NA","60":"0.02","61":"-0.03","62":"0.02","63":"-289","64":"111","65":"-123","66":"-372","67":"344","68":"512","69":"NA","70":"NA","71":"NA","72":"NA","73":"NA","74":"NA","75":"NA","76":"NA","77":"NA","78":"NA","79":"NA","80":"NA","81":"NA","82":"NA","83":"NA","84":"13.43120","85":"-70.39379","86":"-84.87363","87":"NA","88":"NA","89":"NA","90":"NA","91":"NA","92":"NA","93":"NA","94":"NA","95":"NA","96":"NA","97":"NA","98":"NA","99":"NA","100":"NA","101":"NA","102":"37","103":"NA","104":"NA","105":"NA","106":"NA","107":"NA","108":"NA","109":"NA","110":"NA","111":"NA","112":"NA","113":"0","114":"-0.02","115":"-0.02","116":"-232","117":"48","118":"-269","119":"-552","120":"303","121":"-60","122":"28.1","123":"-63.9","124":"-152","125":"NA","126":"NA","127":"NA","128":"NA","129":"NA","130":"NA","131":"NA","132":"NA","133":"NA","134":"NA","135":"NA","136":"NA","137":"NA","138":"NA","139":"NA","140":"36","141":"NA","142":"NA","143":"NA","144":"NA","145":"NA","146":"NA","147":"NA","148":"NA","149":"NA","150":"NA","151":"0.02","152":"-0.02","153":"0.00","154":"189","155":"206","156":"-214","157":"-16","158":"658","159":"469","160":"A"},{"1":"5","2":"carlitos","3":"1323084232","4":"196328","5":"05/12/2011 11:23","6":"no","7":"12","8":"1.48","9":"8.07","10":"-94.4","11":"3","12":"NA","13":"NA","14":"NA","15":"NA","16":"NA","17":"NA","18":"NA","19":"NA","20":"NA","21":"NA","22":"NA","23":"NA","24":"NA","25":"NA","26":"NA","27":"NA","28":"NA","29":"NA","30":"NA","31":"NA","32":"NA","33":"NA","34":"NA","35":"NA","36":"NA","37":"0.02","38":"0.02","39":"-0.02","40":"-21","41":"2","42":"24","43":"-6","44":"600","45":"-302","46":"-128","47":"22.1","48":"-161","49":"34","50":"NA","51":"NA","52":"NA","53":"NA","54":"NA","55":"NA","56":"NA","57":"NA","58":"NA","59":"NA","60":"0.00","61":"-0.03","62":"0.00","63":"-289","64":"111","65":"-123","66":"-374","67":"337","68":"506","69":"NA","70":"NA","71":"NA","72":"NA","73":"NA","74":"NA","75":"NA","76":"NA","77":"NA","78":"NA","79":"NA","80":"NA","81":"NA","82":"NA","83":"NA","84":"13.37872","85":"-70.42856","86":"-84.85306","87":"NA","88":"NA","89":"NA","90":"NA","91":"NA","92":"NA","93":"NA","94":"NA","95":"NA","96":"NA","97":"NA","98":"NA","99":"NA","100":"NA","101":"NA","102":"37","103":"NA","104":"NA","105":"NA","106":"NA","107":"NA","108":"NA","109":"NA","110":"NA","111":"NA","112":"NA","113":"0","114":"-0.02","115":"0.00","116":"-233","117":"48","118":"-270","119":"-554","120":"292","121":"-68","122":"28.0","123":"-63.9","124":"-152","125":"NA","126":"NA","127":"NA","128":"NA","129":"NA","130":"NA","131":"NA","132":"NA","133":"NA","134":"NA","135":"NA","136":"NA","137":"NA","138":"NA","139":"NA","140":"36","141":"NA","142":"NA","143":"NA","144":"NA","145":"NA","146":"NA","147":"NA","148":"NA","149":"NA","150":"NA","151":"0.02","152":"0.00","153":"-0.02","154":"189","155":"206","156":"-214","157":"-17","158":"655","159":"473","160":"A"},{"1":"6","2":"carlitos","3":"1323084232","4":"304277","5":"05/12/2011 11:23","6":"no","7":"12","8":"1.45","9":"8.06","10":"-94.4","11":"3","12":"NA","13":"NA","14":"NA","15":"NA","16":"NA","17":"NA","18":"NA","19":"NA","20":"NA","21":"NA","22":"NA","23":"NA","24":"NA","25":"NA","26":"NA","27":"NA","28":"NA","29":"NA","30":"NA","31":"NA","32":"NA","33":"NA","34":"NA","35":"NA","36":"NA","37":"0.02","38":"0.00","39":"-0.02","40":"-21","41":"4","42":"21","43":"0","44":"603","45":"-312","46":"-128","47":"22.0","48":"-161","49":"34","50":"NA","51":"NA","52":"NA","53":"NA","54":"NA","55":"NA","56":"NA","57":"NA","58":"NA","59":"NA","60":"0.02","61":"-0.03","62":"0.00","63":"-289","64":"111","65":"-122","66":"-369","67":"342","68":"513","69":"NA","70":"NA","71":"NA","72":"NA","73":"NA","74":"NA","75":"NA","76":"NA","77":"NA","78":"NA","79":"NA","80":"NA","81":"NA","82":"NA","83":"NA","84":"13.38246","85":"-70.81759","86":"-84.46500","87":"NA","88":"NA","89":"NA","90":"NA","91":"NA","92":"NA","93":"NA","94":"NA","95":"NA","96":"NA","97":"NA","98":"NA","99":"NA","100":"NA","101":"NA","102":"37","103":"NA","104":"NA","105":"NA","106":"NA","107":"NA","108":"NA","109":"NA","110":"NA","111":"NA","112":"NA","113":"0","114":"-0.02","115":"0.00","116":"-234","117":"48","118":"-269","119":"-558","120":"294","121":"-66","122":"27.9","123":"-63.9","124":"-152","125":"NA","126":"NA","127":"NA","128":"NA","129":"NA","130":"NA","131":"NA","132":"NA","133":"NA","134":"NA","135":"NA","136":"NA","137":"NA","138":"NA","139":"NA","140":"36","141":"NA","142":"NA","143":"NA","144":"NA","145":"NA","146":"NA","147":"NA","148":"NA","149":"NA","150":"NA","151":"0.02","152":"-0.02","153":"-0.03","154":"193","155":"203","156":"-215","157":"-9","158":"660","159":"478","160":"A"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
+<pre class="r"><code>train_skim &lt;- skim(train_data)# inspect variable type, completeness and distribution
+
+train_skim %&gt;% 
+  filter(complete_rate &gt; 0.03) %&gt;% 
+  select(skim_variable) -&gt; hold_vars # create the predictors that we will keep
+
+train_data %&gt;%
+  select(hold_vars$skim_variable) %&gt;% 
+  select(-c(user_name, X1, cvtd_timestamp, num_window, new_window, raw_timestamp_part_1, raw_timestamp_part_2)) -&gt; qc1_train_data
+
+# are the classes equally represented?
+qc1_train_data %&gt;% 
+  count(classe) # yes, roughly speaking</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
 {"columns":[{"label":["classe"],"name":[1],"type":["chr"],"align":["left"]},{"label":["n"],"name":[2],"type":["int"],"align":["right"]}],"data":[{"1":"A","2":"5580"},{"1":"B","2":"3797"},{"1":"C","2":"3422"},{"1":"D","2":"3216"},{"1":"E","2":"3607"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
+<pre class="expolre2"><code># what is the skewness like in the predictors?
+qc1_train_data %&gt;% 
+  select(-classe) %&gt;% 
+  map_dbl(skewness) -&gt; skewness
+
+
+skewness %&gt;% 
+ as_tibble() %&gt;% 
+  mutate(skew_type = case_when(
+    abs(value) &gt; 1 ~ &quot;highly&quot;,
+    abs(value) &gt; 0.5 ~ &quot;moderate&quot;,
+    abs(value) &gt; 0 ~ &quot;slightly&quot;
+  )) -&gt; skewness_rating
+
+skewness_rating$var &lt;- names(skewness)
+skewness_rating %&gt;% 
+  count(skew_type)
+
+# check for correlation between any of the predictors
+# qc1_train_data %&gt;% 
+  # dplyr::select(-classe) %&gt;% 
+  # pcor() -&gt; pcor
+
+# pcor[[&quot;estimate&quot;]] -&gt; p_correlations</code></pre>
 </div>
 <div id="modelling" class="section level2">
 <h2>Modelling</h2>
@@ -242,6 +293,37 @@ summary {
 <div id="random-forest-model" class="section level2">
 <h2>Random Forest Model</h2>
 <p>The first model to be tried is a random forest model. We will use 100 trees, and the default settings for the model as per the parsnip package.</p>
+<pre class="r"><code>set.seed(1225)
+
+exercise_data &lt;- qc1_train_data %&gt;% 
+  initial_split(prop = 4/5, strata = classe) # note we're using the subset of 'good' predictors
+
+exercise_data %&gt;% 
+  training() %&gt;%
+  glimpse() # 15700 x 53
+
+# prep the data for a random forest model, by scaling and centering the predictors
+exercise_recipe_rf &lt;- exercise_data %&gt;%
+  training() %&gt;% 
+  recipe(classe ~ .) %&gt;%
+  step_string2factor(all_outcomes(), -all_predictors()) %&gt;% 
+  step_corr(all_predictors()) %&gt;% 
+  step_scale(all_predictors(), -all_outcomes()) %&gt;% 
+  step_center(all_predictors(), -all_outcomes()) %&gt;% prep()
+
+exercise_training_prepped &lt;- juice(exercise_recipe_rf)  
+  
+exercise_testing_prepped &lt;- exercise_recipe_rf %&gt;% 
+  bake(new_data = testing(exercise_data))</code></pre>
+<pre class="r"><code>exercise_ranger &lt;- rand_forest(trees = 100, mode = &quot;classification&quot;) %&gt;%
+  set_engine(&quot;ranger&quot;) %&gt;%
+  fit(classe ~ ., data = exercise_training_prepped)
+
+ranger_results &lt;- predict(exercise_ranger, exercise_testing_prepped)
+
+ranger_results %&gt;% 
+  bind_cols(exercise_testing_prepped) %&gt;% 
+  metrics(truth = classe, estimate = .pred_class)</code></pre>
 <p>The fitted model returns an out of bag error rate of 0.027, which is an excellent result.</p>
 <p>For the Random Forest model predicting on the tes tset, we obtain the following metrics:</p>
 <blockquote>
@@ -253,18 +335,79 @@ kappa 0.992</p>
 <div id="logistic-regression" class="section level2">
 <h2>Logistic Regression</h2>
 <p>Next we will attempt to fit a logistic regression model. This type of model is popular due to its ease of intrepretation, but it has some flaws, including sacrificing performance in favour of intrepretability. I am using as a guide the excellent work by Max Kuhn in his book with Johnson <em>“Feature Engineering and Selection”</em>, also <a href="https://tidymodels.github.io/tune/reference/tune_grid.html" class="uri">https://tidymodels.github.io/tune/reference/tune_grid.html</a>, <a href="https://tidymodels.github.io/parsnip/reference/logistic_reg.html" class="uri">https://tidymodels.github.io/parsnip/reference/logistic_reg.html</a>,</p>
+<pre class="r"><code>exercise_recipe_glm &lt;- exercise_data %&gt;%
+  training() %&gt;% 
+  recipe(classe ~ .) %&gt;%
+  step_string2factor(all_outcomes(), -all_predictors()) %&gt;%
+  step_corr(all_predictors()) %&gt;% 
+  step_scale(all_predictors(), -all_outcomes()) %&gt;% 
+  step_center(all_predictors(), -all_outcomes()) %&gt;% prep()
+
+exercise_training_glm_prepped &lt;- juice(exercise_recipe_glm)
+
+exercise_testing_glm_prepped &lt;- exercise_recipe_glm %&gt;% 
+  bake(new_data = testing(exercise_data))
+
+exercise_logis_reg &lt;- 
+  logistic_reg(mode = &quot;classification&quot;) %&gt;% 
+  set_engine(&quot;glm&quot;) %&gt;% 
+  fit(classe ~ .,data = exercise_training_glm_prepped)
+
+glm_result &lt;- predict(exercise_logis_reg, exercise_testing_glm_prepped)
+
+bind_cols(glm_result, exercise_testing_glm_prepped) %&gt;% 
+  metrics(truth = classe, estimate = .pred_class)</code></pre>
 <p>The return for the out-of-sample fitted model is as follows:</p>
 <blockquote>
 <p>accuracy 0.391<br />
 kap 0.222</p>
 </blockquote>
 <p>This isn’t a terriffic result in the light of what was achieved with the previous Random Forest Model. It might be worthwhile running a tuning process to try to improve the model’s predictive accuracy, and to use cross-validation also. The vignette on caret found <a href="https://cran.r-project.org/web/packages/caret/vignettes/caret.html">here</a> was very useful.</p>
+<pre class="r"><code># parsnip is proving onerous in terms of the learning curve, especially for tuning etc. Applied Predictive Modelling book has a good section on modelling the compressive strength of concrete, where several different models are fitted, using cross-validation and tuning grids.
+library(caret)
+
+myControl &lt;- trainControl(
+                           method = &quot;cv&quot;, number = 10,
+                           summaryFunction = defaultSummary,
+                           classProbs = TRUE # Super important!
+                          )
+
+myGrid &lt;- expand.grid(
+                       alpha = 0:1,
+                       lambda = seq(0.0001, 1, length = 20)
+                      )
+
+
+set.seed(100368)
+
+glmnet_model &lt;- train(classe ~ ., 
+                      data = exercise_training_glm_prepped,
+                      method = &quot;glmnet&quot;, 
+                      trControl = myControl,
+                      tuneGrid = myGrid)
+
+glmnet_result &lt;- as_tibble(predict(glmnet_model, exercise_testing_prepped))
+
+bind_cols(glmnet_result, exercise_testing_glm_prepped) %&gt;% 
+  metrics(truth = classe, estimate = value)</code></pre>
 <p>A “glmnet” model was tuned using 10-fold cross-validation, and with a training grid with alpha ranging from 0 to 1, and 30 values of lambda ranging from 0.0001 to 1. The best model fitted was that with alpha = 1, and lambda = 1e-04, with Accuracy of 0.6343305 and kappa of 0.5355138.</p>
 <p>In predicting on the test set with this model, the accuracy returned was 0.619, kappa of 0.515.</p>
 </div>
 <div id="support-vector-machines" class="section level2">
 <h2>Support Vector Machines</h2>
 <p>The third and final model to be fitted is Support Vector Machines with a Linear Kernel. Three repeats of 10-fold cross-validation were used, with a tuning length of 10.</p>
+<pre class="r"><code>set.seed(150313)
+
+trctrl &lt;- trainControl(method = &quot;repeatedcv&quot;, number = 10, repeats = 3)
+
+svm_Linear &lt;- train(classe ~., data = exercise_training_prepped, method = &quot;svmLinear&quot;,
+                 trControl=trctrl,
+                 tuneLength = 10)
+
+svm_result &lt;- as_tibble(predict(svm_Linear, exercise_testing_prepped))
+
+bind_cols(svm_result, exercise_testing_prepped) %&gt;% 
+  metrics(truth = classe, estimate = value)</code></pre>
 <p>The SVM model returned an accuracy of 0.7530993 and a kappa score of 0.6859386. On the test set, the model performed with an accuracy of 0.752 and a kappa of 0.684. This is a reasonable result.</p>
 </div>
 <div id="outcomes" class="section level2">

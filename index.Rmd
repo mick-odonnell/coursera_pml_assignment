@@ -1,0 +1,273 @@
+---
+title: "Practical Machine Learning Assignment"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+
+# Introduction
+
+Here is the project brief:
+
+>Background
+
+>>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r knitr-options, include=FALSE}
+knitr::opts_chunk$set(error = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r setup, include=TRUE, eval=TRUE}
+library(tidyverse)
+library(tidymodels)
+library(parsnip)
+library(skimr)
+library(moments) # for skewness test
+library(caret)
+#library(tune)
+
+#train_data <- read_csv("data/pml-training.csv")
+#test_data <- read_csv("data/pml-testing.csv")
+
+train_data <- read_csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+test_data <- read_csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
+```
+
+## Exploration
+
+The first task is to explore the data, to reveal what type of modelling might be appropriate, and what sort of preprocessing is necessary. 
+
+_Note:_ I have elected to use the `tidymodels` package, as it is the natural evolution of the caret package, utilising the `parsnip` package by the same creator, Max Kuhn.  
+
+* Initial view of the dataset shows that it is quite a complex dataset - 160 variables! Definitely worth looking at the background data, which I will comment on next.  
+* The __"Class"__ is the outcome here - we have five outcomes ranging from A to E, A being optimum activity.  
+
+> Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+* the variables will need to be trimmed to those which denote measurements given by the sensors being used (belt, arm, dumbbell).  
+* there seem to be a lot of NA values, with only around 100 variables having only 2% of datapoints recorded - I am going to discount these observations as an equipment failure - no other method of imputation could succesfully complete these variables. 
+* removing the mostly incomplete predictors and admin variables (timestamp etc) leaves us with 52 predictors.  
+* the scale over all of the predictors range from negative -1000 to positive 1000, with some predictors in the 10e-02 scale. There might be a need to scale and centre?  
+* initial look at the mini-histograms via `skim` does not show any major skewing errors, but some more investigation of this may be necessary.. About a quarter are highly skewed, another quarter are moderately skewed, and half are roughly symmetrical.  
+* there is some degree of correlation between the predictors but it is relatively minor. It will be controlled for in any case.
+
+
+```{r explore1, eval = TRUE}
+head(train_data)
+train_skim <- skim(train_data)# inspect variable type, completeness and distribution
+
+train_skim %>% 
+  filter(complete_rate > 0.03) %>% 
+  select(skim_variable) -> hold_vars # create the predictors that we will keep
+
+train_data %>%
+  select(hold_vars$skim_variable) %>% 
+  select(-c(user_name, X1, cvtd_timestamp, num_window, new_window, raw_timestamp_part_1, raw_timestamp_part_2)) -> qc1_train_data
+
+# are the classes equally represented?
+qc1_train_data %>% 
+  count(classe) # yes, roughly speaking
+```
+
+```{expolre2, eval = FALSE}
+# what is the skewness like in the predictors?
+qc1_train_data %>% 
+  select(-classe) %>% 
+  map_dbl(skewness) -> skewness
+
+
+skewness %>% 
+ as_tibble() %>% 
+  mutate(skew_type = case_when(
+    abs(value) > 1 ~ "highly",
+    abs(value) > 0.5 ~ "moderate",
+    abs(value) > 0 ~ "slightly"
+  )) -> skewness_rating
+
+skewness_rating$var <- names(skewness)
+skewness_rating %>% 
+  count(skew_type)
+
+# check for correlation between any of the predictors
+# qc1_train_data %>% 
+  # dplyr::select(-classe) %>% 
+  # pcor() -> pcor
+
+# pcor[["estimate"]] -> p_correlations
+```
+
+## Modelling
+
+Let's attempt to fit three types of models naively, and see what type of results we get. First we will need to subset the data, in order to allow us to perform some vaildation on the data with our models. We will create an 80:20 split, and use the _classe_ variable to stratify.
+
+We will utilise the `recipes` package to create out pre-processing workflow on our training data, which can then be applied to the testing data. Big credit to the excellent tutorial at [RViews](https://rviews.rstudio.com/2019/06/19/a-gentle-intro-to-tidymodels/). 
+
+## Random Forest Model
+
+The first model to be tried is a random forest model. We will use 100 trees, and the default settings for the model as per the parsnip package.
+
+```{r data-prep, eval=FALSE}
+set.seed(1225)
+
+exercise_data <- qc1_train_data %>% 
+  initial_split(prop = 4/5, strata = classe) # note we're using the subset of 'good' predictors
+
+exercise_data %>% 
+  training() %>%
+  glimpse() # 15700 x 53
+
+# prep the data for a random forest model, by scaling and centering the predictors
+exercise_recipe_rf <- exercise_data %>%
+  training() %>% 
+  recipe(classe ~ .) %>%
+  step_string2factor(all_outcomes(), -all_predictors()) %>% 
+  step_corr(all_predictors()) %>% 
+  step_scale(all_predictors(), -all_outcomes()) %>% 
+  step_center(all_predictors(), -all_outcomes()) %>% prep()
+
+exercise_training_prepped <- juice(exercise_recipe_rf)  
+  
+exercise_testing_prepped <- exercise_recipe_rf %>% 
+  bake(new_data = testing(exercise_data))
+```
+
+
+```{r modelling-rf, eval=FALSE}
+exercise_ranger <- rand_forest(trees = 100, mode = "classification") %>%
+  set_engine("ranger") %>%
+  fit(classe ~ ., data = exercise_training_prepped)
+
+ranger_results <- predict(exercise_ranger, exercise_testing_prepped)
+
+ranger_results %>% 
+  bind_cols(exercise_testing_prepped) %>% 
+  metrics(truth = classe, estimate = .pred_class)
+```
+
+The fitted model returns an out of bag error rate of 0.027, which is an excellent result.
+
+For the Random Forest model predicting on the tes tset, we obtain the following metrics:
+ 
+>accuracy  0.994  
+>kappa     0.992  
+
+The high level of accuracy achieved with just the default setting for this model negates the need for a cross-validation or recursive hyperparameter tuning appraoch.
+
+## Logistic Regression
+
+Next we will attempt to fit a logistic regression model. This type of model is popular due to its ease of intrepretation, but it has some flaws, including sacrificing performance in favour of intrepretability. I am using as a guide the excellent work by Max Kuhn in his book with Johnson _"Feature Engineering and Selection"_, also https://tidymodels.github.io/tune/reference/tune_grid.html, https://tidymodels.github.io/parsnip/reference/logistic_reg.html, 
+
+```{r logistic-regression, eval = FALSE}
+exercise_recipe_glm <- exercise_data %>%
+  training() %>% 
+  recipe(classe ~ .) %>%
+  step_string2factor(all_outcomes(), -all_predictors()) %>%
+  step_corr(all_predictors()) %>% 
+  step_scale(all_predictors(), -all_outcomes()) %>% 
+  step_center(all_predictors(), -all_outcomes()) %>% prep()
+
+exercise_training_glm_prepped <- juice(exercise_recipe_glm)
+
+exercise_testing_glm_prepped <- exercise_recipe_glm %>% 
+  bake(new_data = testing(exercise_data))
+
+exercise_logis_reg <- 
+  logistic_reg(mode = "classification") %>% 
+  set_engine("glm") %>% 
+  fit(classe ~ .,data = exercise_training_glm_prepped)
+
+glm_result <- predict(exercise_logis_reg, exercise_testing_glm_prepped)
+
+bind_cols(glm_result, exercise_testing_glm_prepped) %>% 
+  metrics(truth = classe, estimate = .pred_class)
+```
+
+The return for the out-of-sample fitted model is as follows:
+
+>accuracy  0.391  
+>kap       0.222
+
+This isn't a terriffic result in the light of what was achieved with the previous Random Forest Model. It might be worthwhile running a tuning process to try to improve the model's predictive accuracy, and to use cross-validation also. The vignette on caret found [here](https://cran.r-project.org/web/packages/caret/vignettes/caret.html) was very useful.
+
+```{r tuning, eval = FALSE}
+# parsnip is proving onerous in terms of the learning curve, especially for tuning etc. Applied Predictive Modelling book has a good section on modelling the compressive strength of concrete, where several different models are fitted, using cross-validation and tuning grids.
+library(caret)
+
+myControl <- trainControl(
+                           method = "cv", number = 10,
+                           summaryFunction = defaultSummary,
+                           classProbs = TRUE # Super important!
+                          )
+
+myGrid <- expand.grid(
+                       alpha = 0:1,
+                       lambda = seq(0.0001, 1, length = 20)
+                      )
+
+
+set.seed(100368)
+
+glmnet_model <- train(classe ~ ., 
+                      data = exercise_training_glm_prepped,
+                      method = "glmnet", 
+                      trControl = myControl,
+                      tuneGrid = myGrid)
+
+glmnet_result <- as_tibble(predict(glmnet_model, exercise_testing_prepped))
+
+bind_cols(glmnet_result, exercise_testing_glm_prepped) %>% 
+  metrics(truth = classe, estimate = value)
+```
+
+A "glmnet" model was tuned using 10-fold cross-validation, and with a training grid with alpha ranging from 0 to 1, and 30 values of lambda ranging from 0.0001 to 1. The best model fitted was that with alpha = 1, and lambda = 1e-04, with Accuracy of 0.6343305  and kappa of 0.5355138.
+
+In predicting on the test set with this model, the accuracy returned was 0.619, kappa of 0.515.
+
+## Support Vector Machines
+
+The third and final model to be fitted is Support Vector Machines with a Linear Kernel. Three repeats of 10-fold cross-validation were used, with a tuning length of 10.
+
+```{r svm, eval = FALSE}
+set.seed(150313)
+
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+svm_Linear <- train(classe ~., data = exercise_training_prepped, method = "svmLinear",
+                 trControl=trctrl,
+                 tuneLength = 10)
+
+svm_result <- as_tibble(predict(svm_Linear, exercise_testing_prepped))
+
+bind_cols(svm_result, exercise_testing_prepped) %>% 
+  metrics(truth = classe, estimate = value)
+```
+
+The SVM model returned an accuracy of 0.7530993 and a kappa score of 0.6859386. On the test set, the model performed with an accuracy of 0.752 and a kappa of 0.684.
+This is a reasonable result.
+
+## Outcomes
+
+The best model fitted by far was the Random Forest, and it seemed to perform optimally with respect to the time it took to fit also.This will therefore be used to predict the 20 test examples. 
+
+The table below summarises the test prediction accuracy from the various models:
+
+| Model                      | Accuracy      | Kappa  |
+| -------------              |-------------  | -----  |
+| Random Forest              | 0.994         | 0.992  |
+| glm                        | 0.392         | 0.222  |
+| glmnet (10 fold CV)        | 0.619         | 0.535  |
+| SVM    (repeat cv, 10 x 3) | 0.752         | 0.684  | 
